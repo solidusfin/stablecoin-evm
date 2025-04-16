@@ -1,0 +1,28 @@
+[profile.default]
+optimizer = true
+optimizer_runs = 100000
+via_ir = true
+solc = "0.8.28"
+evm_version = "cancun"
+
+src = "src"
+out = "out"
+libs = ["dependencies"]
+
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+
+gas_reports = ["StableTokenV1"]
+
+[dependencies]
+forge-std = "1.9.6"
+"@openzeppelin-contracts" = "5.2.0"
+"@openzeppelin-contracts-upgradeable" = "5.2.0"
+openzeppelin-foundry-upgrades = "0.4.0"
+
+[rpc_endpoints]
+  localhost = "http://localhost:8545"
+  mainnet = "https://rpc.mevblocker.io"
+  sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
