@@ -2,8 +2,8 @@
 pragma solidity ^0.8.26;
 
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Utils} from "./Utils.sol";
 
 /**
  * @title EIP-3009
@@ -14,6 +14,8 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
  * authorizations off-chain and third parties can execute them on-chain.
  */
 abstract contract EIP3009 is ERC20PermitUpgradeable {
+    using Utils for bytes;
+
     bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
         keccak256(
             "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
@@ -96,6 +98,41 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
     /**
      * @notice Execute a transfer with a signed authorization
      * @dev This function accepts the v, r, s components of the signature separately
+     * EOA wallet signatures should be packed in the order of r, s, v.
+     * @param from          Payer's address (Authorizer)
+     * @param to            Payee's address
+     * @param value         Amount to be transferred
+     * @param validAfter    The time after which this is valid (unix time)
+     * @param validBefore   The time before which this is valid (unix time)
+     * @param nonce         Unique nonce to prevent replay attacks
+     * @param signature     Signature byte array produced by an EOA wallet
+     */
+    function transferWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata signature
+    ) public virtual {
+        (bytes32 r, bytes32 s, uint8 v) = signature.decodeRSV();
+        transferWithAuthorization(
+            from,
+            to,
+            value,
+            validAfter,
+            validBefore,
+            nonce,
+            v,
+            r,
+            s
+        );
+    }
+
+    /**
+     * @notice Execute a transfer with a signed authorization
+     * @dev This function accepts a packed signature byte array
      * @param from          Payer's address (Authorizer)
      * @param to            Payee's address
      * @param value         Amount to be transferred
@@ -116,38 +153,6 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
-        transferWithAuthorization(
-            from,
-            to,
-            value,
-            validAfter,
-            validBefore,
-            nonce,
-            abi.encodePacked(r, s, v)
-        );
-    }
-
-    /**
-     * @notice Execute a transfer with a signed authorization
-     * @dev This function accepts a packed signature byte array
-     * EOA wallet signatures should be packed in the order of r, s, v.
-     * @param from          Payer's address (Authorizer)
-     * @param to            Payee's address
-     * @param value         Amount to be transferred
-     * @param validAfter    The time after which this is valid (unix time)
-     * @param validBefore   The time before which this is valid (unix time)
-     * @param nonce         Unique nonce to prevent replay attacks
-     * @param signature     Signature byte array produced by an EOA wallet or a contract wallet
-     */
-    function transferWithAuthorization(
-        address from,
-        address to,
-        uint256 value,
-        uint256 validAfter,
-        uint256 validBefore,
-        bytes32 nonce,
-        bytes memory signature
     ) public virtual {
         _requireValidAuthorization(from, nonce, validAfter, validBefore);
         _requireValidSignature(
@@ -163,7 +168,9 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
                     nonce
                 )
             ),
-            signature
+            v,
+            r,
+            s
         );
 
         _markAuthorizationAsUsed(from, nonce);
@@ -173,6 +180,43 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
     /**
      * @notice Receive a transfer with a signed authorization from the payer
      * @dev This function accepts the v, r, s components of the signature separately
+     * This has an additional check to ensure that the payee's address
+     * matches the caller of this function to prevent front-running attacks.
+     * EOA wallet signatures should be packed in the order of r, s, v.
+     * @param from          Payer's address (Authorizer)
+     * @param to            Payee's address
+     * @param value         Amount to be transferred
+     * @param validAfter    The time after which this is valid (unix time)
+     * @param validBefore   The time before which this is valid (unix time)
+     * @param nonce         Unique nonce to prevent replay attacks
+     * @param signature     Signature byte array produced by an EOA wallet
+     */
+    function receiveWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata signature
+    ) public virtual {
+        (bytes32 r, bytes32 s, uint8 v) = signature.decodeRSV();
+        receiveWithAuthorization(
+            from,
+            to,
+            value,
+            validAfter,
+            validBefore,
+            nonce,
+            v,
+            r,
+            s
+        );
+    }
+
+    /**
+     * @notice Receive a transfer with a signed authorization from the payer
+     * @dev This function accepts a packed signature byte array
      * This has an additional check to ensure that the payee's address
      * matches the caller of this function to prevent front-running attacks.
      * @param from          Payer's address (Authorizer)
@@ -195,40 +239,6 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
-        receiveWithAuthorization(
-            from,
-            to,
-            value,
-            validAfter,
-            validBefore,
-            nonce,
-            abi.encodePacked(r, s, v)
-        );
-    }
-
-    /**
-     * @notice Receive a transfer with a signed authorization from the payer
-     * @dev This function accepts a packed signature byte array
-     * This has an additional check to ensure that the payee's address
-     * matches the caller of this function to prevent front-running attacks.
-     * EOA wallet signatures should be packed in the order of r, s, v.
-     * @param from          Payer's address (Authorizer)
-     * @param to            Payee's address
-     * @param value         Amount to be transferred
-     * @param validAfter    The time after which this is valid (unix time)
-     * @param validBefore   The time before which this is valid (unix time)
-     * @param nonce         Unique nonce to prevent replay attacks
-     * @param signature     Signature byte array produced by an EOA wallet or a contract wallet
-     */
-    function receiveWithAuthorization(
-        address from,
-        address to,
-        uint256 value,
-        uint256 validAfter,
-        uint256 validBefore,
-        bytes32 nonce,
-        bytes memory signature
     ) public virtual {
         if (to != msg.sender) revert CallerNotPayee(msg.sender);
 
@@ -246,7 +256,9 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
                     nonce
                 )
             ),
-            signature
+            v,
+            r,
+            s
         );
 
         _markAuthorizationAsUsed(from, nonce);
@@ -256,7 +268,25 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
     /**
      * @notice Attempt to cancel an authorization
      * @dev This function accepts the v, r, s components of the signature separately
+     * EOA wallet signatures should be packed in the order of r, s, v.
      * @param authorizer    Authorizer's address
+     * @param nonce         Nonce of the authorization to cancel
+     * @param signature     Signature byte array produced by an EOA wallet
+     */
+    function cancelAuthorization(
+        address authorizer,
+        bytes32 nonce,
+        bytes calldata signature
+    ) public virtual {
+        (bytes32 r, bytes32 s, uint8 v) = signature.decodeRSV();
+        cancelAuthorization(authorizer, nonce, v, r, s);
+    }
+
+    /**
+     * @notice Attempt to cancel an authorization
+     * @dev This function accepts a packed signature byte array
+     * @param authorizer    Authorizer's address
+     * @param nonce         Nonce of the authorization to cancel
      * @param nonce         Nonce of the authorization to cancel
      * @param v             v of the signature
      * @param r             r of the signature
@@ -269,29 +299,15 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
         bytes32 r,
         bytes32 s
     ) public virtual {
-        cancelAuthorization(authorizer, nonce, abi.encodePacked(r, s, v));
-    }
-
-    /**
-     * @notice Attempt to cancel an authorization
-     * @dev This function accepts a packed signature byte array
-     * EOA wallet signatures should be packed in the order of r, s, v.
-     * @param authorizer    Authorizer's address
-     * @param nonce         Nonce of the authorization to cancel
-     * @param signature     Signature byte array produced by an EOA wallet or a contract wallet
-     */
-    function cancelAuthorization(
-        address authorizer,
-        bytes32 nonce,
-        bytes memory signature
-    ) public virtual {
         _requireUnusedAuthorization(authorizer, nonce);
         _requireValidSignature(
             authorizer,
             keccak256(
                 abi.encode(CANCEL_AUTHORIZATION_TYPEHASH, authorizer, nonce)
             ),
-            signature
+            v,
+            r,
+            s
         );
 
         _authorizationStates[authorizer][nonce] = true;
@@ -300,27 +316,24 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
 
     /**
      * @notice Validates signature against input data struct
-     * @dev Uses OpenZeppelin's SignatureChecker to verify the signature,
-     * which supports both EOA and EIP-1271 contract signatures
+     * @dev Uses OpenZeppelin's ECDSA to verify the signature,
+     * which supports EOA signatures
      * @param signer        Signer's address
-     * @param dataHash      Hash of encoded data struct
-     * @param signature     Signature byte array produced by an EOA wallet or a contract wallet
+     * @param structHash    Hash of encoded data struct
+     * @param v             v of the signature
+     * @param r             r of the signature
+     * @param s             s of the signature
      */
     function _requireValidSignature(
         address signer,
-        bytes32 dataHash,
-        bytes memory signature
+        bytes32 structHash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     ) private view {
-        if (
-            !SignatureChecker.isValidSignatureNow(
-                signer,
-                MessageHashUtils.toTypedDataHash(
-                    _domainSeparatorV4(),
-                    dataHash
-                ),
-                signature
-            )
-        ) revert InvalidSignature();
+        if (signer != ECDSA.recover(_hashTypedDataV4(structHash), v, r, s)) {
+            revert InvalidSignature();
+        }
     }
 
     /**

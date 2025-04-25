@@ -23,10 +23,6 @@ contract DeployScript is BaseScript {
                     "Stable Token",
                     "SSS",
                     owners[0],
-                    owners[0],
-                    owners[0],
-                    owners[0],
-                    owners[0],
                     owners[0]
                 )
             )

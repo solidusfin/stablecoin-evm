@@ -42,34 +42,24 @@ contract StableTokenV1 is
      * @param name Name of the token
      * @param symbol Symbol of the token
      * @param defaultAdmin Address of the default admin
-     * @param upgrader Address with permission to upgrade the contract
-     * @param pauser Address with permission to pause/unpause the contract
-     * @param rescuer Address with permission to rescue tokens
-     * @param blacklister Address with permission to blacklist addresses
      * @param mainMinter Address with permission to manage minters
      */
     function initialize(
         string calldata name,
         string calldata symbol,
         address defaultAdmin,
-        address upgrader,
-        address pauser,
-        address rescuer,
-        address blacklister,
         address mainMinter
     ) public initializer {
+        assert(defaultAdmin != address(0));
+        assert(mainMinter != address(0));
+
         __UUPSUpgradeable_init();
         __Pausable_init();
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
         __AccessControlDefaultAdminRules_init(3 days, defaultAdmin);
 
-        _grantRole(UPGRADER_ROLE, upgrader);
-        _grantRole(PAUSER_ROLE, pauser);
-        _grantRole(RESCUER_ROLE, rescuer);
-        _grantRole(BLACKLISTER_ROLE, blacklister);
         _grantRole(MAIN_MINTER_ROLE, mainMinter);
-
         _setRoleAdmin(MINTER_ROLE, MAIN_MINTER_ROLE);
     }
 
@@ -194,7 +184,7 @@ contract StableTokenV1 is
 
     /**
      * @notice Internal function to set the allowance of tokens that a spender can use from an owner's account
-     * @dev Overrides the parent contract's _approve function to add pause check
+     * @dev Overrides the parent contract's _approve function to add pause and blacklist check
      * @param owner The address that owns the tokens
      * @param spender The address authorized to spend the tokens
      * @param value The amount of tokens to allow
@@ -205,7 +195,7 @@ contract StableTokenV1 is
         address spender,
         uint256 value,
         bool emitEvent
-    ) internal override whenNotPaused {
+    ) internal override whenNotPaused notBlacklisted(owner) {
         super._approve(owner, spender, value, emitEvent);
     }
 
@@ -265,7 +255,7 @@ contract StableTokenV1 is
     function cancelAuthorization(
         address authorizer,
         bytes32 nonce,
-        bytes memory signature
+        bytes calldata signature
     ) public override whenNotPaused {
         super.cancelAuthorization(authorizer, nonce, signature);
     }

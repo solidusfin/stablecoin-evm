@@ -18,7 +18,7 @@ library Utils {
 
     /**
      * @notice Decodes a signature into its r, s, v components
-     * @dev Supports both standard 65-byte signatures and EIP-2098 compact 64-byte signatures
+     * @dev Supports standard 65-byte signatures
      * @param signature The signature bytes to decode
      * @return r The r component of the signature
      * @return s The s component of the signature
@@ -31,12 +31,6 @@ library Utils {
             // Standard signature format
             (r, s) = abi.decode(signature, (bytes32, bytes32));
             v = uint8(signature[64]);
-        } else if (signature.length == 64) {
-            // EIP-2098 compact signature format
-            bytes32 vs;
-            (r, vs) = abi.decode(signature, (bytes32, bytes32));
-            s = vs & UPPER_BIT_MASK;
-            v = uint8(uint256(vs >> 255)) + 27;
         } else {
             revert InvalidSignatureLength();
         }
