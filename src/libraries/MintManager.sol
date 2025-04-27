@@ -52,6 +52,7 @@ abstract contract MintManager is
         address minter,
         uint256 minterAllowedAmount
     ) public virtual onlyRole(MAIN_MINTER_ROLE) returns (bool) {
+        assert(minter != address(0));
         _grantRole(MINTER_ROLE, minter);
         _minterAllowed[minter] = minterAllowedAmount;
         emit MinterConfigured(minter, minterAllowedAmount);
