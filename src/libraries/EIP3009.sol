@@ -287,7 +287,6 @@ abstract contract EIP3009 is ERC20PermitUpgradeable {
      * @dev This function accepts a packed signature byte array
      * @param authorizer    Authorizer's address
      * @param nonce         Nonce of the authorization to cancel
-     * @param nonce         Nonce of the authorization to cancel
      * @param v             v of the signature
      * @param r             r of the signature
      * @param s             s of the signature

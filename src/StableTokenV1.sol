@@ -195,7 +195,13 @@ contract StableTokenV1 is
         address spender,
         uint256 value,
         bool emitEvent
-    ) internal override whenNotPaused notBlacklisted(owner) {
+    )
+        internal
+        override
+        whenNotPaused
+        notBlacklisted(owner)
+        notBlacklisted(spender)
+    {
         super._approve(owner, spender, value, emitEvent);
     }
 
