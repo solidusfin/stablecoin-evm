@@ -125,10 +125,10 @@ Role-based access control is implemented with the following roles:
 | rescueERC20 | Write | No | No |
 | mint | Write | Yes | Yes |
 | burn | Write | Yes | Yes |
-| approve | Write | Yes | No |
-| permit | Write | Yes | No |
-| increaseAllowance | Write | Yes | No |
-| decreaseAllowance | Write | Yes | No |
+| approve | Write | Yes | Yes |
+| permit | Write | Yes | Yes |
+| increaseAllowance | Write | Yes | Yes |
+| decreaseAllowance | Write | Yes | Yes |
 | transfer | Write | Yes | Yes |
 | transferFrom | Write | Yes | Yes |
 | transferWithAuthorization | Write | Yes | Yes |
