@@ -58,6 +58,7 @@ contract MultiSigWallet {
     error InvalidOwner(address account);
     error NoExistOwner(address account);
     error NoExistTransaction(uint256 transactionId);
+    error InvalidDestination(address destination);
     error ConfirmedTransaction(uint256 transactionId);
     error NotConfirmedTransaction(uint256 transactionId);
     error ExecutedTransaction(uint256 transactionId);
@@ -145,7 +146,7 @@ contract MultiSigWallet {
             }
         }
         owners.pop();
-        if (required > owners.length) changeRequirement(owners.length);
+        if (required + 1 > owners.length) changeRequirement(owners.length - 1);
         emit OwnerRemoval(owner);
     }
 
@@ -195,6 +196,9 @@ contract MultiSigWallet {
         uint256 value,
         bytes calldata data
     ) public returns (uint256 transactionId) {
+        if (destination == address(0)) {
+            revert InvalidDestination(destination);
+        }
         transactionId = _addTransaction(destination, value, data);
         confirmTransaction(transactionId);
     }
@@ -283,23 +287,6 @@ contract MultiSigWallet {
     }
 
     /**
-     * @dev Gets the total number of transactions after filtering
-     * @param pending Include pending transactions
-     * @param executed Include executed transactions
-     * @return count Number of transactions
-     */
-    function getTransactionCount(
-        bool pending,
-        bool executed
-    ) public view returns (uint256 count) {
-        for (uint256 i = 0; i < transactions.length; i++)
-            if (
-                (pending && !transactions[i].executed) ||
-                (executed && transactions[i].executed)
-            ) count += 1;
-    }
-
-    /**
      * @dev Returns list of wallet owners
      * @return Array of owner addresses
      */
@@ -326,37 +313,6 @@ contract MultiSigWallet {
         _confirmations = new address[](count);
         for (uint256 i = 0; i < count; i++)
             _confirmations[i] = confirmationsTemp[i];
-    }
-
-    /**
-     * @dev Returns list of transaction IDs in defined range
-     * @param from Index start position
-     * @param to Index end position
-     * @param pending Include pending transactions
-     * @param executed Include executed transactions
-     * @return _transactionIds Array of transaction IDs
-     */
-    function getTransactionIds(
-        uint256 from,
-        uint256 to,
-        bool pending,
-        bool executed
-    ) public view returns (uint256[] memory _transactionIds) {
-        uint256[] memory transactionIdsTemp = new uint256[](
-            transactions.length
-        );
-        uint256 count = 0;
-        for (uint256 i = 0; i < transactions.length; i++)
-            if (
-                (pending && !transactions[i].executed) ||
-                (executed && transactions[i].executed)
-            ) {
-                transactionIdsTemp[count] = i;
-                count += 1;
-            }
-        _transactionIds = new uint256[](to - from);
-        for (uint256 i = from; i < to; i++)
-            _transactionIds[i - from] = transactionIdsTemp[i];
     }
 
     /**
@@ -387,7 +343,7 @@ contract MultiSigWallet {
     ) internal pure {
         if (
             ownerCount > MAX_OWNER_COUNT ||
-            required_ > ownerCount ||
+            required_ + 1 > ownerCount ||
             required_ < 2
         ) revert InvalidRequirement(ownerCount, required_);
     }
